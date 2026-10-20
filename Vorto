@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vorto Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color: #ffffff;
+            --accent-color: #0088cc;
+            --gray-bg: rgba(255, 255, 255, 0.15);
+            --modal-bg: #1c1c1e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .view {
+            display: none;
+            height: calc(100vh - 60px);
+            width: 100vw;
+            position: relative;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        /* Feed View */
+        #feed-view {
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+        }
+
+        .video-card {
+            height: calc(100vh - 60px);
+            width: 100vw;
+            scroll-snap-align: start;
+            position: relative;
+            background: #111;
+        }
+
+        .video-player {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Overlay UI */
+        .feed-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 15px;
+            right: 70px;
+            z-index: 10;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+
+        .author-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .author-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            object-fit: cover;
+        }
+
+        .author-name {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .follow-btn {
+            background: #ff2b54;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .follow-btn.following {
+            background: rgba(255, 255, 255, 0.25);
+            color: #fff;
+        }
+
+        .video-desc {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        /* Action Bar Right */
+        .actions-sidebar {
+            position: absolute;
+            right: 12px;
+            bottom: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 18px;
+            z-index: 10;
+        }
+
+        .action-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .action-item i {
+            font-size: 28px;
+            margin-bottom: 4px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+
+        .action-item.liked i {
+            color: #ff2b54;
+        }
+
+        .action-text {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* Bottom Nav */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background: #000;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #888;
+            font-size: 11px;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        .nav-item.active {
+            color: #fff;
+        }
+
+        .nav-item i {
+            font-size: 20px;
+        }
+
+        /* Profile View */
+        #profile-view {
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .profile-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .profile-avatar-container {
+            position: relative;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+
+        .profile-avatar {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--accent-color);
+        }
+
+        .avatar-edit-badge {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background: var(--accent-color);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 13px;
+            border: 2px solid #000;
+        }
+
+        .profile-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .profile-username {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            width: 100%;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .profile-actions {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .btn-profile {
+            flex: 1;
+            padding: 10px;
+            background: var(--gray-bg);
+            border: none;
+            color: #fff;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-profile.primary {
+            background: var(--accent-color);
+        }
+
+        /* Modals Sheet */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 200;
+            align-items: flex-end;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            width: 100%;
+            background: var(--modal-bg);
+            border-radius: 16px 16px 0 0;
+            padding: 20px;
+            max-height: 80vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .modal-title {
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .modal-close {
+            font-size: 20px;
+            color: #888;
+            cursor: pointer;
+        }
+
+        .modal-btn-option {
+            width: 100%;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.08);
+            border: none;
+            color: white;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 500;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        /* Camera Modal Stream */
+        #camera-preview {
+            width: 100%;
+            height: 250px;
+            background: #000;
+            border-radius: 12px;
+            object-fit: cover;
+            margin-bottom: 15px;
+        }
+
+        /* Hidden inputs */
+        input[type="file"] {
+            display: none;
+        }
+
+        /* Cashout form */
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 6px;
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #fff;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+        }
+
+        .gift-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .gift-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 12px 8px;
+            text-align: center;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+
+        .gift-card:hover {
+            border-color: var(--accent-color);
+        }
+
+        .gift-icon {
+            font-size: 28px;
+            margin-bottom: 6px;
+        }
+
+        .gift-price {
+            font-size: 12px;
+            color: #ffd700;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. FEED VIEW -->
+    <div id="feed-view" class="view active">
+        <!-- Rendered dynamically -->
+    </div>
+
+    <!-- 2. PROFILE VIEW -->
+    <div id="profile-view" class="view">
+        <div class="profile-header">
+            <div class="profile-avatar-container" onclick="openAvatarModal()">
+                <img id="my-avatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150" class="profile-avatar">
+                <div class="avatar-edit-badge"><i class="fa-solid fa-camera"></i></div>
+            </div>
+            <div class="profile-name" id="my-name">Пользователь</div>
+            <div class="profile-username" id="my-username">@user</div>
+
+            <div class="stats-row">
+                <div class="stat-item" onclick="openSubscribersModal('following')">
+                    <div class="stat-value" id="count-following">12</div>
+                    <div class="stat-label">Подписки</div>
+                </div>
+                <div class="stat-item" onclick="openSubscribersModal('followers')">
+                    <div class="stat-value" id="count-followers">148</div>
+                    <div class="stat-label">Подписчики</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="count-stars">250 ⭐</div>
+                    <div class="stat-label">Звезды</div>
+                </div>
+            </div>
+
+            <div class="profile-actions">
+                <button class="btn-profile primary" onclick="openCashoutModal()">
+                    <i class="fa-solid fa-wallet"></i> Вывод
+                </button>
+                <button class="btn-profile" onclick="openSettingsModal()">
+                    <i class="fa-solid fa-gear"></i> Настройки
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM NAVIGATION BAR -->
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('feed')">
+            <i class="fa-solid fa-house"></i>
+            <span>Главная</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('profile')">
+            <i class="fa-solid fa-user"></i>
+            <span>Профиль</span>
+        </div>
+    </div>
+
+    <!-- AVATAR SELECTION MODAL -->
+    <div id="avatar-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Сменить фото профиля</div>
+                <div class="modal-close" onclick="closeModal('avatar-modal')"><i class="fa-solid fa-xmark"></i></div>
+            </div>
+            <button class="modal-btn-option" onclick="document.getElementById('gallery-input').click()">
+                <i class="fa-solid fa-images" style="color:#34c759;"></i> Из галереи
+            </button>
+            <button class="modal-btn-option" onclick="openCameraStream()">
+                <i class="fa-solid fa-camera" style="color:#007aff;"></i> Сделать снимок
+            </button>
+            <input type="file" id="gallery-input" accept="image/*" onchange="handleGalleryUpload(event)">
+        </div>
+    </div>
+
+    <!-- CAMERA SNAP MODAL -->
+    <div id="camera-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Камера</div>
+                <div class="modal-close" onclick="closeCameraStream()"><i class="fa-solid fa-xmark"></i></div>
+            </div>
+            <video id="camera-preview" autoplay playsinline></video>
+            <button class="btn-profile primary" style="width:100%" onclick="takePhotoSnap()">
+                <i class="fa-solid fa-circle-dot"></i> Сделать фото
+            </button>
+        </div>
+    </div>
+
+    <!-- GIFTS MODAL -->
+    <div id="gifts-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Отправить подарок</div>
+                <div class="modal-close" onclick="closeModal('gifts-modal')"><i class="fa-solid fa-xmark"></i></div>
+            </div>
+            <div class="gift-grid">
+                <div class="gift-card" onclick="sendGift('⭐️ 10 Stars', 10)">
+                    <div class="gift-icon">⭐</div>
+                    <div class="gift-price">10 Stars</div>
+                </div>
+                <div class="gift-card" onclick="sendGift('🔥 Огонь', 50)">
+                    <div class="gift-icon">🔥</div>
+                    <div class="gift-price">50 Stars</div>
+                </div>
+                <div class="gift-card" onclick="sendGift('👑 Корона', 100)">
+                    <div class="gift-icon">👑</div>
+                    <div class="gift-price">100 Stars</div>
+                </div>
+                <div class="gift-card" onclick="sendGift('🚀 В топ', 250)">
+                    <div class="gift-icon">🚀</div>
+                    <div class="gift-price">250 Stars</div>
+                </div>
+                <div class="gift-card" onclick="sendGift('💎 Алмаз', 500)">
+                    <div class="gift-icon">💎</div>
+                    <div class="gift-price">500 Stars</div>
+                </div>
+                <div class="gift-card" onclick="sendGift('🏆 Кубок', 1000)">
+                    <div class="gift-icon">🏆</div>
+                    <div class="gift-price">1000 Stars</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CASHOUT / WITHDRAWAL MODAL -->
+    <div id="cashout-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Вывод баланса подарков</div>
+                <div class="modal-close" onclick="closeModal('cashout-modal')"><i class="fa-solid fa-xmark"></i></div>
+            </div>
+            <div class="input-group">
+                <label>Доступный баланс</label>
+                <input type="text" id="cashout-balance-display" value="250 ⭐ (~$3.25 USD)" readonly>
+            </div>
+            <div class="input-group">
+                <label>Способ вывода</label>
+                <select id="cashout-method">
+                    <option value="ton">Telegram Wallet (TON)</option>
+                    <option value="card">Банковская карта</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Реквизиты / Адрес кошелька</label>
+                <input type="text" id="cashout-address" placeholder="EQD... или номер карты">
+            </div>
+            <button class="btn-profile primary" style="width:100%" onclick="processCashout()">
+                Запросить вывод
+            </button>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Настройки</div>
+                <div class="modal-close" onclick="closeModal('settings-modal')"><i class="fa-solid fa-xmark"></i></div>
+            </div>
+            <button class="modal-btn-option" onclick="openLanguageModal()">
+                <i class="fa-solid fa-globe"></i> Язык / Language
+            </button>
+            <button class="modal-btn-option" onclick="alert('Уведомления включены')">
+                <i class="fa-solid fa-bell"></i> Уведомления
+            </button>
+        </div>
+    </div>
+
+    <!-- SUBSCRIBERS / LIST MODAL -->
+    <div id="subscribers-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="subs-modal-title">Список</div>
+                <div class="modal-close" onclick="closeModal('subscribers-modal')"><i class="fa-solid fa-xmark"></i></div>
+            </div>
+            <div id="subs-list-content" style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
+                <!-- Dynamically generated list -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // Demo feed data
+        const videosData = [
+            {
+                id: 1,
+                videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-tree-with-yellow-flowers-1173-large.mp4",
+                author: "Alex_Vlog",
+                avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100",
+                desc: "Красивая природа! ✨ #vorto #travel",
+                likes: 1240,
+                isLiked: false,
+                isFollowing: false
+            },
+            {
+                id: 2,
+                videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-vertical-shot-of-a-neon-sign-41525-large.mp4",
+                author: "CyberKitten",
+                avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100",
+                desc: "Ночной город 🌃 #vibes",
+                likes: 850,
+                isLiked: false,
+                isFollowing: true
+            }
+        ];
+
+        let cameraStream = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderFeed();
+            initUserTelegramData();
+            checkFirstLaunchLanguage();
+        });
+
+        function initUserTelegramData() {
+            if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                const u = tg.initDataUnsafe.user;
+                document.getElementById('my-name').innerText = (u.first_name || '') + ' ' + (u.last_name || '');
+                document.getElementById('my-username').innerText = u.username ? '@' + u.username : '@user';
+                if (u.photo_url) {
+                    document.getElementById('my-avatar').src = u.photo_url;
+                }
+            }
+        }
+
+        function checkFirstLaunchLanguage() {
+            if (!localStorage.getItem('vorto_lang')) {
+                localStorage.setItem('vorto_lang', 'ru');
+            }
+        }
+
+        function renderFeed() {
+            const feedContainer = document.getElementById('feed-view');
+            feedContainer.innerHTML = '';
+
+            videosData.forEach((video, index) => {
+                const card = document.createElement('div');
+                card.className = 'video-card';
+                card.innerHTML = `
+                    <video class="video-player" loop playsinline src="${video.videoUrl}" onclick="togglePlay(this)"></video>
+                    
+                    <div class="feed-overlay">
+                        <div class="author-info">
+                            <img src="${video.avatar}" class="author-avatar">
+                            <span class="author-name">${video.author}</span>
+                            <button class="follow-btn ${video.isFollowing ? 'following' : ''}" onclick="toggleFollow(${index})">
+                                ${video.isFollowing ? 'Вы подписаны' : '+ Подписаться'}
+                            </button>
+                        </div>
+                        <div class="video-desc">${video.desc}</div>
+                    </div>
+
+                    <div class="actions-sidebar">
+                        <div class="action-item ${video.isLiked ? 'liked' : ''}" onclick="toggleLike(${index})">
+                            <i class="fa-solid fa-heart"></i>
+                            <span class="action-text">${video.likes}</span>
+                        </div>
+                        <div class="action-item" onclick="openModal('gifts-modal')">
+                            <i class="fa-solid fa-gift" style="color:#ffd700;"></i>
+                            <span class="action-text">Подарок</span>
+                        </div>
+                        <div class="action-item" onclick="shareVideo(${video.id})">
+                            <i class="fa-solid fa-share"></i>
+                            <span class="action-text">Репост</span>
+                        </div>
+                    </div>
+                `;
+                feedContainer.appendChild(card);
+            });
+
+            // Autoplay first video
+            setTimeout(() => {
+                const firstVideo = feedContainer.querySelector('video');
+                if (firstVideo) firstVideo.play().catch(() => {});
+            }, 300);
+        }
+
+        function togglePlay(videoEl) {
+            if (videoEl.paused) {
+                videoEl.play();
+            } else {
+                videoEl.pause();
+            }
+        }
+
+        function toggleLike(index) {
+            videosData[index].isLiked = !videosData[index].isLiked;
+            videosData[index].likes += videosData[index].isLiked ? 1 : -1;
+            renderFeed();
+        }
+
+        function toggleFollow(index) {
+            videosData[index].isFollowing = !videosData[index].isFollowing;
+            let currentFollowers = parseInt(document.getElementById('count-following').innerText);
+            document.getElementById('count-following').innerText = videosData[index].isFollowing ? currentFollowers + 1 : Math.max(0, currentFollowers - 1);
+            renderFeed();
+        }
+
+        function shareVideo(id) {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Vorto Video',
+                    text: 'Посмотри это видео в Vorto Mini App!',
+                    url: window.location.href
+                }).catch(() => {});
+            } else {
+                alert('Ссылка на видео скопирована!');
+            }
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+            if (tabName === 'feed') {
+                document.getElementById('feed-view').classList.add('active');
+                document.querySelectorAll('.nav-item')[0].classList.add('active');
+            } else if (tabName === 'profile') {
+                document.getElementById('profile-view').classList.add('active');
+                document.querySelectorAll('.nav-item')[1].classList.add('active');
+            }
+        }
+
+        // Modals Controls
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        function openAvatarModal() {
+            openModal('avatar-modal');
+        }
+
+        function openCashoutModal() {
+            openModal('cashout-modal');
+        }
+
+        function openSettingsModal() {
+            openModal('settings-modal');
+        }
+
+        // Profile Avatar Upload handlers
+        function handleGalleryUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    document.getElementById('my-avatar').src = evt.target.result;
+                    closeModal('avatar-modal');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function openCameraStream() {
+            closeModal('avatar-modal');
+            openModal('camera-modal');
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                document.getElementById('camera-preview').srcObject = cameraStream;
+            } catch (err) {
+                alert("Ошибка доступа к камере");
+                closeModal('camera-modal');
+            }
+        }
+
+        function closeCameraStream() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+            closeModal('camera-modal');
+        }
+
+        function takePhotoSnap() {
+            const video = document.getElementById('camera-preview');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || 300;
+            canvas.height = video.videoHeight || 300;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            document.getElementById('my-avatar').src = canvas.toDataURL('image/png');
+            closeCameraStream();
+        }
+
+        function sendGift(name, cost) {
+            closeModal('gifts-modal');
+            alert(`Вы успешно отправили подарок ${name}!`);
+        }
+
+        function processCashout() {
+            const addr = document.getElementById('cashout-address').value;
+            if (!addr) {
+                alert('Пожалуйста, укажите реквизиты!');
+                return;
+            }
+            closeModal('cashout-modal');
+            alert('Заявка на вывод успешно отправлена!');
+        }
+
+        function openSubscribersModal(type) {
+            const title = type === 'followers' ? 'Подписчики' : 'Подписки';
+            document.getElementById('subs-modal-title').innerText = title;
+            const container = document.getElementById('subs-list-content');
+            
+            container.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=50" style="width:40px;height:40px;border-radius:50%;">
+                    <div>
+                        <div style="font-weight:bold;">CyberKitten</div>
+                        <div style="font-size:12px;color:#888;">@cyber_cat</div>
+                    </div>
+                </div>
+            `;
+            openModal('subscribers-modal');
+        }
+    </script>
+</body>
+</html>
